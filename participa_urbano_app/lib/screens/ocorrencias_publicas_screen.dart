@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import 'ocorrencia_detalhes_screen.dart';
 
 class OcorrenciasPublicasScreen extends StatefulWidget {
   @override
@@ -68,6 +69,14 @@ class _OcorrenciasPublicasScreenState extends State<OcorrenciasPublicasScreen> {
                     label: Text(status, style: TextStyle(color: Colors.white, fontSize: 10)),
                     backgroundColor: _getStatusColor(status),
                   ),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => OcorrenciaDetalhesScreen(ocorrencia: oc),
+                      ),
+                    );
+                  },
                 ),
               );
             },

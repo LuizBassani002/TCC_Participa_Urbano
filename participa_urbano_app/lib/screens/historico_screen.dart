@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import 'ocorrencia_detalhes_screen.dart';
 
 class HistoricoScreen extends StatefulWidget {
   @override
@@ -43,6 +44,14 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
                   leading: Icon(Icons.report, color: Colors.green, size: 40),
                   title: Text(oc['descricao'] ?? 'Sem descrição', style: TextStyle(fontWeight: FontWeight.bold)),
                   subtitle: Text('Status: ${oc['status']} | Prioridade: ${oc['prioridade']}'),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => OcorrenciaDetalhesScreen(ocorrencia: oc),
+                      ),
+                    );
+                  },
                 ),
               );
             },

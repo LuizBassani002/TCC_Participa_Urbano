@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import '../services/api_service.dart';
 
 class CreateOccurrenceScreen extends StatefulWidget {
@@ -45,12 +47,60 @@ class _CreateOccurrenceScreenState extends State<CreateOccurrenceScreen> {
 
     if (permission == LocationPermission.deniedForever) return;
 
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Obtendo coordenadas do GPS...')));
+
     Position position = await Geolocator.getCurrentPosition();
     setState(() {
       _currentPosition = position;
     });
-    
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Localização capturada!')));
+
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Obtendo endereço a partir do GPS...')));
+
+    try {
+      final url = Uri.parse('https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.latitude}&lon=${position.longitude}');
+      final response = await http.get(url, headers: {
+        'User-Agent': 'ParticipaUrbanoApp/1.0',
+      });
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final addressMap = data['address'] as Map<String, dynamic>?;
+        String? address;
+
+        if (addressMap != null) {
+          String road = addressMap['road'] ?? addressMap['pedestrian'] ?? addressMap['suburb'] ?? '';
+          String number = addressMap['house_number'] ?? '';
+          String city = addressMap['city'] ?? addressMap['town'] ?? addressMap['village'] ?? '';
+          String state = addressMap['state'] ?? '';
+          
+          List<String> parts = [];
+          if (road.isNotEmpty) parts.add(road);
+          if (number.isNotEmpty) parts.add(number);
+          if (city.isNotEmpty) parts.add(city);
+          if (state.isNotEmpty) parts.add(state);
+          
+          if (parts.isNotEmpty) {
+            address = parts.join(', ');
+          }
+        }
+
+        address ??= data['display_name'] as String?;
+
+        if (address != null && address.isNotEmpty) {
+          setState(() {
+            _enderecoController.text = address!;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Endereço preenchido com sucesso!'), backgroundColor: Colors.green));
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Não foi possível obter o endereço legível.')));
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro no servidor de geolocalização.')));
+      }
+    } catch (e) {
+      print('Erro ao obter endereço: $e');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao converter coordenadas em endereço.')));
+    }
   }
 
   void _submit() async {
@@ -101,6 +151,13 @@ class _CreateOccurrenceScreenState extends State<CreateOccurrenceScreen> {
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.map)
               ),
+              onChanged: (value) {
+                if (_currentPosition != null) {
+                  setState(() {
+                    _currentPosition = null;
+                  });
+                }
+              },
             ),
             SizedBox(height: 15),
             Row(

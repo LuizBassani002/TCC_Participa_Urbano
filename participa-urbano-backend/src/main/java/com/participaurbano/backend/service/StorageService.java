@@ -1,33 +1,69 @@
 package com.participaurbano.backend.service;
 
+import io.minio.*;
+import io.minio.http.Method;
+import io.minio.messages.Bucket;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.annotation.PostConstruct;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.UUID;
 
 @Service
 public class StorageService {
 
-    @Value("${file.upload-dir}")
-    private String uploadDir;
+    @Value("${minio.url}")
+    private String minioUrl;
 
-    private Path fileStorageLocation;
+    @Value("${minio.access-key}")
+    private String accessKey;
+
+    @Value("${minio.secret-key}")
+    private String secretKey;
+
+    @Value("${minio.bucket-name}")
+    private String bucketName;
+
+    private MinioClient minioClient;
 
     @PostConstruct
     public void init() {
-        this.fileStorageLocation = Paths.get(uploadDir).toAbsolutePath().normalize();
+        minioClient = MinioClient.builder()
+                .endpoint(minioUrl)
+                .credentials(accessKey, secretKey)
+                .build();
+
         try {
-            Files.createDirectories(this.fileStorageLocation);
-        } catch (Exception ex) {
-            throw new RuntimeException("Não foi possível criar o diretório onde os arquivos serão armazenados.", ex);
+            boolean exists = minioClient.bucketExists(
+                    BucketExistsArgs.builder().bucket(bucketName).build()
+            );
+
+            if (!exists) {
+                minioClient.makeBucket(
+                        MakeBucketArgs.builder().bucket(bucketName).build()
+                );
+                // Define política pública de leitura para o bucket
+                String policy = "{"
+                        + "\"Version\":\"2012-10-17\","
+                        + "\"Statement\":[{"
+                        + "\"Effect\":\"Allow\","
+                        + "\"Principal\":{\"AWS\":[\"*\"]},"
+                        + "\"Action\":[\"s3:GetObject\"],"
+                        + "\"Resource\":[\"arn:aws:s3:::" + bucketName + "/*\"]"
+                        + "}]}";
+                minioClient.setBucketPolicy(
+                        SetBucketPolicyArgs.builder()
+                                .bucket(bucketName)
+                                .config(policy)
+                                .build()
+                );
+                System.out.println("Bucket '" + bucketName + "' criado com política pública de leitura.");
+            } else {
+                System.out.println("Bucket '" + bucketName + "' já existe.");
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Erro ao inicializar conexão com MinIO: " + e.getMessage(), e);
         }
     }
 
@@ -36,29 +72,55 @@ public class StorageService {
             return null;
         }
 
-        // Normalize file name
-        String originalName = StringUtils.cleanPath(file.getOriginalFilename());
-        String extension = "";
-        
-        if (originalName.contains(".")) {
-            extension = originalName.substring(originalName.lastIndexOf("."));
-        }
-        
-        String fileName = UUID.randomUUID().toString() + extension;
-
         try {
-            // Check if the file's name contains invalid characters
-            if (fileName.contains("..")) {
-                throw new RuntimeException("Nome do arquivo contém caminho inválido: " + fileName);
+            String originalName = file.getOriginalFilename();
+            String extension = "";
+            if (originalName != null && originalName.contains(".")) {
+                extension = originalName.substring(originalName.lastIndexOf("."));
             }
 
-            // Copy file to the target location (Replacing existing file with the same name)
-            Path targetLocation = this.fileStorageLocation.resolve(fileName);
-            Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
+            String objectName = UUID.randomUUID().toString() + extension;
 
-            return targetLocation.toString(); // For real apps, this should be an accessible URL, e.g., S3 URL
-        } catch (IOException ex) {
-            throw new RuntimeException("Não foi possível salvar o arquivo " + fileName + ". Tente novamente!", ex);
+            minioClient.putObject(
+                    PutObjectArgs.builder()
+                            .bucket(bucketName)
+                            .object(objectName)
+                            .stream(file.getInputStream(), file.getSize(), -1)
+                            .contentType(file.getContentType())
+                            .build()
+            );
+
+            // Retorna apenas o nome do objeto (sem URL completa)
+            // A URL será gerada pelo ImageController como proxy
+            return objectName;
+
+        } catch (Exception e) {
+            throw new RuntimeException("Erro ao fazer upload para MinIO: " + e.getMessage(), e);
         }
+    }
+
+    public GetObjectResponse getObject(String objectName) throws Exception {
+        // Extrai só o nome do arquivo caso seja uma URL completa salva anteriormente
+        if (objectName.contains("/")) {
+            objectName = objectName.substring(objectName.lastIndexOf("/") + 1);
+        }
+        return minioClient.getObject(
+                GetObjectArgs.builder()
+                        .bucket(bucketName)
+                        .object(objectName)
+                        .build()
+        );
+    }
+
+    public StatObjectResponse statObject(String objectName) throws Exception {
+        if (objectName.contains("/")) {
+            objectName = objectName.substring(objectName.lastIndexOf("/") + 1);
+        }
+        return minioClient.statObject(
+                StatObjectArgs.builder()
+                        .bucket(bucketName)
+                        .object(objectName)
+                        .build()
+        );
     }
 }
