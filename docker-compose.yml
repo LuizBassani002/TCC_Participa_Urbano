@@ -1,0 +1,23 @@
+services:
+  # ======================================
+  # MinIO (S3 para testes com Spark)
+  # ======================================
+  minio:
+    #image: minio/minio:RELEASE.2025-04-22T22-12-26Z # versao antiga com varias funcionallidades
+    #image: minio/minio:RELEASE.2025-05-24T17-08-30Z-cpuv1
+    image: minio/minio:latest
+    container_name: minio
+    hostname: minio
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=admin
+      - MINIO_ROOT_PASSWORD=admin123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - spark-net
+
+ 
