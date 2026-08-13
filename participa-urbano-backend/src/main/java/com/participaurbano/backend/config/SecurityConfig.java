@@ -40,8 +40,13 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/registrar").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/imagens/**").permitAll()
+                        
+                        // REGRAS DE GESTÃO (RESTRITAS A GESTOR)
                         .requestMatchers(HttpMethod.PATCH, "/api/ocorrencias/*/status").hasRole("GESTOR")
+                        .requestMatchers(HttpMethod.DELETE, "/api/ocorrencias/*").hasRole("GESTOR") // <-- LINHA ADICIONADA AQUI!
                         .requestMatchers(HttpMethod.GET, "/api/ocorrencias").hasRole("GESTOR")
+                        
+                        // REGRAS PÚBLICAS / CITADÃO AUTENTICADO
                         .requestMatchers(HttpMethod.GET, "/api/ocorrencias/publicas").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/ocorrencias/minhas").authenticated()
                         .anyRequest().authenticated()

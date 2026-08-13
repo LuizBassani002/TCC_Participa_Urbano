@@ -56,17 +56,17 @@ class ApiService {
       final token = await storage.read(key: 'jwt');
 
       var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/ocorrencias'));
-    request.headers['Authorization'] = 'Bearer $token';
-    
-    request.fields['descricao'] = descricao;
-    
-    if (endereco != null && endereco.isNotEmpty) {
-      request.fields['endereco'] = endereco;
-    }
-    if (latitude != null && longitude != null) {
-      request.fields['latitude'] = latitude.toString();
-      request.fields['longitude'] = longitude.toString();
-    }
+      request.headers['Authorization'] = 'Bearer $token';
+      
+      request.fields['descricao'] = descricao;
+      
+      if (endereco != null && endereco.isNotEmpty) {
+        request.fields['endereco'] = endereco;
+      }
+      if (latitude != null && longitude != null) {
+        request.fields['latitude'] = latitude.toString();
+        request.fields['longitude'] = longitude.toString();
+      }
 
       if (imageFile != null) {
         if (kIsWeb) {
@@ -83,7 +83,7 @@ class ApiService {
       var streamedResponse = await request.send();
       return streamedResponse.statusCode == 201;
     } catch (e) {
-      print("Erro ao disparar api: \$e");
+      print("Erro ao disparar api: $e");
       return false;
     }
   }
@@ -141,6 +141,25 @@ class ApiService {
       return response.statusCode == 200;
     } catch (e) {
       print('ERRO updateStatus: $e');
+      return false;
+    }
+  }
+
+  // NOVO MÉTODO DE EXCLUSÃO
+  Future<bool> deleteOcorrencia(int ocorrenciaId) async {
+    try {
+      final token = await storage.read(key: 'jwt');
+      final response = await http.delete(
+        Uri.parse('$baseUrl/ocorrencias/$ocorrenciaId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+      print('DELETE status: ${response.statusCode}');
+      return response.statusCode == 200 || response.statusCode == 204;
+    } catch (e) {
+      print('ERRO deleteOcorrencia: $e');
       return false;
     }
   }

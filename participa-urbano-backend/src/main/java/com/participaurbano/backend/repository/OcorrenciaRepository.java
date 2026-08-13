@@ -10,10 +10,11 @@ import java.util.List;
 @Repository
 public interface OcorrenciaRepository extends JpaRepository<Ocorrencia, Long> {
 
-    // Useful for finding similar recurrences in a naive box roughly representing proximity
+    // Método para trazer todas as ocorrências ordenadas pela Prioridade mais alta
+    List<Ocorrencia> findAllByOrderByPrioridadeDescDataCriacaoDesc();
+
     List<Ocorrencia> findByLatitudeBetweenAndLongitudeBetween(
             Double latStart, Double latEnd, Double lonStart, Double lonEnd);
             
-    // Optional: finding unresolved occurrences
     List<Ocorrencia> findByStatusNotAndDataCriacaoBefore(com.participaurbano.backend.domain.enums.StatusOcorrencia status, LocalDateTime date);
 }

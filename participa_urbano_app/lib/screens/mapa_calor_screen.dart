@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import '../services/api_service.dart';
 
 class MapaCalorScreen extends StatefulWidget {
@@ -16,6 +18,63 @@ class _MapaCalorScreenState extends State<MapaCalorScreen> {
     _ocorrenciasFuture = _apiService.getAllOcorrencias();
   }
 
+  // Método para construir o widget do mapa com as ocorrências de Blumenau
+  Widget _buildMapa(List<dynamic> ocorrencias) {
+    // Coordenadas centrais de Blumenau/SC
+    const LatLng centroBlumenau = LatLng(-26.9166, -49.0717);
+
+    // Mapeia todas as ocorrências que possuem latitude e longitude válidas
+    List<Marker> markers = ocorrencias
+        .where((oc) => oc['latitude'] != null && oc['longitude'] != null)
+        .map((oc) {
+      double lat = (oc['latitude'] as num).toDouble();
+      double lng = (oc['longitude'] as num).toDouble();
+      String prioridade = oc['prioridade'] ?? 'BAIXA';
+
+      return Marker(
+        point: LatLng(lat, lng),
+        width: 40,
+        height: 40,
+        child: Tooltip(
+          message: '${oc['descricao'] ?? "Ocorrência"} ($prioridade)',
+          child: Icon(
+            Icons.location_on,
+            color: _getPrioridadeColor(prioridade),
+            size: 38,
+          ),
+        ),
+      );
+    }).toList();
+
+    // Centraliza na primeira ocorrência ou no centro de Blumenau
+    LatLng centroInicial = markers.isNotEmpty ? markers.first.point : centroBlumenau;
+
+    return Container(
+      height: 300,
+      margin: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade400),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: FlutterMap(
+          options: MapOptions(
+            initialCenter: centroInicial,
+            initialZoom: 13.0,
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'com.participa.urbano',
+            ),
+            MarkerLayer(markers: markers),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -31,7 +90,7 @@ class _MapaCalorScreenState extends State<MapaCalorScreen> {
 
           final ocorrencias = snapshot.data!;
 
-          // Agrupar por Categoria
+          // Agrupar por Categoria, Status e Prioridade
           Map<String, int> porCategoria = {};
           Map<String, int> porStatus = {};
           Map<String, int> porPrioridade = {};
@@ -100,6 +159,12 @@ class _MapaCalorScreenState extends State<MapaCalorScreen> {
                 }),
                 SizedBox(height: 20),
 
+                // Mapa de Localização das Ocorrências
+                Text('Localização no Mapa (Blumenau)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                _buildMapa(ocorrencias),
+
+                SizedBox(height: 10),
+
                 // Indicadores por Prioridade
                 Text('Nível de Urgência', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 SizedBox(height: 10),
@@ -108,7 +173,10 @@ class _MapaCalorScreenState extends State<MapaCalorScreen> {
                   runSpacing: 10,
                   children: porPrioridade.entries.map((entry) {
                     return Chip(
-                      avatar: CircleAvatar(backgroundColor: _getPrioridadeColor(entry.key), child: Text(entry.value.toString(), style: TextStyle(color: Colors.white, fontSize: 12))),
+                      avatar: CircleAvatar(
+                        backgroundColor: _getPrioridadeColor(entry.key),
+                        child: Text(entry.value.toString(), style: TextStyle(color: Colors.white, fontSize: 12)),
+                      ),
                       label: Text(entry.key),
                       backgroundColor: _getPrioridadeColor(entry.key).withOpacity(0.2),
                     );

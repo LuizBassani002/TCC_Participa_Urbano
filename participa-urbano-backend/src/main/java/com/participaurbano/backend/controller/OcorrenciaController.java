@@ -17,6 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -50,7 +51,6 @@ public class OcorrenciaController {
             @RequestParam(value = "longitude", required = false) Double longitude,
             @RequestPart(value = "fotos", required = false) List<MultipartFile> fotos) {
 
-        // Get currently logged in user
         Usuario loggedUser = (Usuario) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
         Ocorrencia ocorrencia = new Ocorrencia();
@@ -59,7 +59,7 @@ public class OcorrenciaController {
         ocorrencia.setLatitude(latitude);
         ocorrencia.setLongitude(longitude);
         ocorrencia.setDataCriacao(LocalDateTime.now());
-        ocorrencia.setCidadao(loggedUser); // Associating with the citizen
+        ocorrencia.setCidadao(loggedUser);
 
         // 1. Intelligent Classification
         ocorrencia.setCategoria(classificationService.classify(descricao));
@@ -85,7 +85,6 @@ public class OcorrenciaController {
         return new ResponseEntity<>(saved, HttpStatus.CREATED);
     }
 
-    // Endpoint available only for ROLE_FUNCIONARIO
     @PatchMapping("/{id}/status")
     public ResponseEntity<Ocorrencia> updateStatus(
             @PathVariable Long id,
@@ -104,32 +103,84 @@ public class OcorrenciaController {
         return ResponseEntity.ok(saved);
     }
 
-    // Endpoint disponível apenas para ROLE_GESTOR (ver SecurityConfig)
-    @GetMapping
-    public ResponseEntity<List<Ocorrencia>> getAllOcorrencias() {
-        return ResponseEntity.ok(ocorrenciaRepository.findAll());
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteOcorrencia(@PathVariable Long id) {
+        if (!ocorrenciaRepository.existsById(id)) {
+            return ResponseEntity.notFound().build();
+        }
+
+        ocorrenciaRepository.deleteById(id);
+        return ResponseEntity.noContent().build();
     }
 
-    // Endpoint disponível para qualquer usuário logado (cidadão ou gestor)
-    // Mostra apenas ocorrências que o gestor já aprovou (status != PENDENTE)
+    @GetMapping
+    public ResponseEntity<List<Ocorrencia>> getAllOcorrencias() {
+        return ResponseEntity.ok(buscarEOrtenarOcorrencias());
+    }
+
     @GetMapping("/publicas")
     public ResponseEntity<List<Ocorrencia>> getOcorrenciasPublicas() {
-        List<Ocorrencia> todas = ocorrenciaRepository.findAll();
+        List<Ocorrencia> todas = buscarEOrtenarOcorrencias();
         List<Ocorrencia> aprovadas = todas.stream()
             .filter(o -> o.getStatus() != StatusOcorrencia.PENDENTE)
+            .sorted((o1, o2) -> Integer.compare(
+                getPesoPrioridade(o2.getPrioridade()),
+                getPesoPrioridade(o1.getPrioridade())
+            ))
             .toList();
+            
         return ResponseEntity.ok(aprovadas);
     }
 
-    // Endpoint disponível para qualquer usuário logado
     @GetMapping("/minhas")
     public ResponseEntity<List<Ocorrencia>> getMinhasOcorrencias() {
         Usuario loggedUser = (Usuario) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        List<Ocorrencia> todas = ocorrenciaRepository.findAll();
+        List<Ocorrencia> todas = buscarEOrtenarOcorrencias();
         List<Ocorrencia> minhas = todas.stream()
             .filter(o -> o.getCidadao() != null && o.getCidadao().getId().equals(loggedUser.getId()))
+            .sorted((o1, o2) -> Integer.compare(
+                getPesoPrioridade(o2.getPrioridade()),
+                getPesoPrioridade(o1.getPrioridade())
+            ))
             .toList();
 
         return ResponseEntity.ok(minhas);
+    }
+
+    // Método auxiliar privado seguro para recalcular e ordenar a lista
+    private List<Ocorrencia> buscarEOrtenarOcorrencias() {
+        List<Ocorrencia> lista = new ArrayList<>(ocorrenciaRepository.findAll());
+
+        // Recalcula a prioridade atual de cada ocorrência com suporte a exceções/dados antigos
+        for (Ocorrencia o : lista) {
+            try {
+                Prioridade p = priorizacaoService.calcularPrioridade(o);
+                if (p != null) {
+                    o.setPrioridade(p);
+                }
+            } catch (Exception e) {
+                if (o.getPrioridade() == null) {
+                    o.setPrioridade(Prioridade.BAIXA);
+                }
+            }
+        }
+
+        // Ordena por peso de prioridade decrescente (CRITICA -> ALTA -> MEDIA -> BAIXA)
+        lista.sort((o1, o2) -> Integer.compare(
+            getPesoPrioridade(o2.getPrioridade()),
+            getPesoPrioridade(o1.getPrioridade())
+        ));
+
+        return lista;
+    }
+
+    private int getPesoPrioridade(Prioridade prioridade) {
+        if (prioridade == null) return 1;
+        return switch (prioridade) {
+            case CRITICA -> 4;
+            case ALTA -> 3;
+            case MEDIA -> 2;
+            case BAIXA -> 1;
+        };
     }
 }

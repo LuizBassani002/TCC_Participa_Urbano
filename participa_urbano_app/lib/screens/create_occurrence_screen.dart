@@ -35,7 +35,9 @@ class _CreateOccurrenceScreenState extends State<CreateOccurrenceScreen> {
 
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ative o serviço de GPS.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ative o serviço de GPS.')),
+      );
       return;
     }
 
@@ -47,17 +49,32 @@ class _CreateOccurrenceScreenState extends State<CreateOccurrenceScreen> {
 
     if (permission == LocationPermission.deniedForever) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Obtendo coordenadas do GPS...')));
-
-    Position position = await Geolocator.getCurrentPosition();
-    setState(() {
-      _currentPosition = position;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Obtendo endereço a partir do GPS...')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Obtendo coordenadas do GPS com alta precisão...')),
+    );
 
     try {
-      final url = Uri.parse('https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.latitude}&lon=${position.longitude}');
+      // Configuração para forçar a melhor precisão disponível no dispositivo
+      LocationSettings locationSettings = const LocationSettings(
+        accuracy: LocationAccuracy.best,
+        timeLimit: Duration(seconds: 15),
+      );
+
+      Position position = await Geolocator.getCurrentPosition(
+        locationSettings: locationSettings,
+      );
+
+      setState(() {
+        _currentPosition = position;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Obtendo endereço a partir do GPS...')),
+      );
+
+      final url = Uri.parse(
+        'https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.latitude}&lon=${position.longitude}',
+      );
       final response = await http.get(url, headers: {
         'User-Agent': 'ParticipaUrbanoApp/1.0',
       });
@@ -90,22 +107,32 @@ class _CreateOccurrenceScreenState extends State<CreateOccurrenceScreen> {
           setState(() {
             _enderecoController.text = address!;
           });
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Endereço preenchido com sucesso!'), backgroundColor: Colors.green));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Endereço preenchido com sucesso!'), backgroundColor: Colors.green),
+          );
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Não foi possível obter o endereço legível.')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Não foi possível obter o endereço legível.')),
+          );
         }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro no servidor de geolocalização.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro no servidor de geolocalização.')),
+        );
       }
     } catch (e) {
-      print('Erro ao obter endereço: $e');
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao converter coordenadas em endereço.')));
+      print('Erro ao obter endereço/localização: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao obter localização ou converter endereço.')),
+      );
     }
   }
 
   void _submit() async {
     if (_descricaoController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Preencha a descrição!')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Preencha a descrição!')),
+      );
       return;
     }
     
@@ -122,10 +149,14 @@ class _CreateOccurrenceScreenState extends State<CreateOccurrenceScreen> {
     setState(() => _isLoading = false);
 
     if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ocorrência salva com sucesso!')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ocorrência salva com sucesso!')),
+      );
       Navigator.pop(context);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Falha ao salvar.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Falha ao salvar.')),
+      );
     }
   }
 
@@ -141,7 +172,10 @@ class _CreateOccurrenceScreenState extends State<CreateOccurrenceScreen> {
             TextField(
               controller: _descricaoController,
               maxLines: 3,
-              decoration: InputDecoration(labelText: 'Descrição do Problema', border: OutlineInputBorder()),
+              decoration: InputDecoration(
+                labelText: 'Descrição do Problema',
+                border: OutlineInputBorder(),
+              ),
             ),
             SizedBox(height: 15),
             TextField(
@@ -149,7 +183,7 @@ class _CreateOccurrenceScreenState extends State<CreateOccurrenceScreen> {
               decoration: InputDecoration(
                 labelText: 'Endereço (Opcional se usar GPS)', 
                 border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.map)
+                prefixIcon: Icon(Icons.map),
               ),
               onChanged: (value) {
                 if (_currentPosition != null) {
@@ -168,7 +202,7 @@ class _CreateOccurrenceScreenState extends State<CreateOccurrenceScreen> {
                   icon: Icon(Icons.gps_fixed),
                   label: Text(_currentPosition == null ? 'Pegar GPS' : 'GPS OK'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _currentPosition == null ? Colors.blue : Colors.green
+                    backgroundColor: _currentPosition == null ? Colors.blue : Colors.green,
                   ),
                 ),
                 ElevatedButton.icon(
@@ -186,9 +220,9 @@ class _CreateOccurrenceScreenState extends State<CreateOccurrenceScreen> {
                   child: Text('ENVIAR OCORRÊNCIA', style: TextStyle(fontSize: 16)),
                   style: ElevatedButton.styleFrom(
                     padding: EdgeInsets.symmetric(vertical: 15),
-                    backgroundColor: Colors.green
+                    backgroundColor: Colors.green,
                   ),
-                )
+                ),
           ],
         ),
       ),
