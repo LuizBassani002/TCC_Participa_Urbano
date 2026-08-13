@@ -29,6 +29,55 @@ class _CreateOccurrenceScreenState extends State<CreateOccurrenceScreen> {
     }
   }
 
+  // BUSCA AS COORDENADAS EXATAS (LAT/LON) A PARTIR DO TEXTO DO ENDEREÇO
+  Future<Position?> _getCoordinatesFromAddress(String enderecoDigitado) async {
+    String enderecoTexto = enderecoDigitado.trim();
+
+    if (enderecoTexto.isEmpty) return null;
+
+    // Adiciona a cidade de referência padrão para garantir que encontre na região correta
+    if (!enderecoTexto.toLowerCase().contains('blumenau')) {
+      enderecoTexto = "$enderecoTexto, Blumenau, SC";
+    }
+
+    try {
+      final encodedAddress = Uri.encodeComponent(enderecoTexto);
+      final url = Uri.parse(
+        'https://nominatim.openstreetmap.org/search?format=json&q=$encodedAddress&limit=1',
+      );
+
+      final response = await http.get(url, headers: {
+        'User-Agent': 'ParticipaUrbanoApp/1.0',
+      });
+
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+
+        if (data.isNotEmpty) {
+          double lat = double.parse(data[0]['lat']);
+          double lon = double.parse(data[0]['lon']);
+
+          return Position(
+            latitude: lat,
+            longitude: lon,
+            timestamp: DateTime.now(),
+            accuracy: 0.0,
+            altitude: 0.0,
+            heading: 0.0,
+            speed: 0.0,
+            speedAccuracy: 0.0,
+            altitudeAccuracy: 0.0,
+            headingAccuracy: 0.0,
+          );
+        }
+      }
+    } catch (e) {
+      print('Erro ao obter coordenadas do endereço digitado: $e');
+    }
+    return null;
+  }
+
+  // PEGA ENDEREÇO E COORDENADAS DO GPS DO APARELHO
   Future<void> _getLocation() async {
     bool serviceEnabled;
     LocationPermission permission;
@@ -36,7 +85,7 @@ class _CreateOccurrenceScreenState extends State<CreateOccurrenceScreen> {
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ative o serviço de GPS.')),
+        const SnackBar(content: Text('Ative o serviço de GPS.')),
       );
       return;
     }
@@ -50,11 +99,10 @@ class _CreateOccurrenceScreenState extends State<CreateOccurrenceScreen> {
     if (permission == LocationPermission.deniedForever) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Obtendo coordenadas do GPS com alta precisão...')),
+      const SnackBar(content: Text('Obtendo coordenadas do GPS...')),
     );
 
     try {
-      // Configuração para forçar a melhor precisão disponível no dispositivo
       LocationSettings locationSettings = const LocationSettings(
         accuracy: LocationAccuracy.best,
         timeLimit: Duration(seconds: 15),
@@ -67,10 +115,6 @@ class _CreateOccurrenceScreenState extends State<CreateOccurrenceScreen> {
       setState(() {
         _currentPosition = position;
       });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Obtendo endereço a partir do GPS...')),
-      );
 
       final url = Uri.parse(
         'https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.latitude}&lon=${position.longitude}',
@@ -108,41 +152,57 @@ class _CreateOccurrenceScreenState extends State<CreateOccurrenceScreen> {
             _enderecoController.text = address!;
           });
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Endereço preenchido com sucesso!'), backgroundColor: Colors.green),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Não foi possível obter o endereço legível.')),
+            const SnackBar(content: Text('Endereço obtido via GPS!'), backgroundColor: Colors.green),
           );
         }
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro no servidor de geolocalização.')),
-        );
       }
     } catch (e) {
-      print('Erro ao obter endereço/localização: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao obter localização ou converter endereço.')),
-      );
+      print('Erro ao obter localização: $e');
     }
   }
 
   void _submit() async {
-    if (_descricaoController.text.isEmpty) {
+    if (_descricaoController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Preencha a descrição!')),
+        const SnackBar(content: Text('Preencha a descrição!')),
       );
       return;
     }
-    
+
     setState(() => _isLoading = true);
-    
+
+    double? finalLatitude = _currentPosition?.latitude;
+    double? finalLongitude = _currentPosition?.longitude;
+    String enderecoTexto = _enderecoController.text.trim();
+
+    // REGRA DE PRIORIDADE:
+    // Se o usuário digitou ou alterou o endereço manualmente, ignora o sensor de GPS do celular
+    // e busca a coordenada exata da rua digitada.
+    if (enderecoTexto.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Buscando localização exata do endereço informado...')),
+      );
+
+      Position? posDoEndereco = await _getCoordinatesFromAddress(enderecoTexto);
+      
+      if (posDoEndereco != null) {
+        finalLatitude = posDoEndereco.latitude;
+        finalLongitude = posDoEndereco.longitude;
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Aviso: Não foi possível calcular a coordenada exata da rua. Usando dados básicos.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    }
+
     bool success = await _apiService.createOcorrencia(
       descricao: _descricaoController.text,
-      endereco: _enderecoController.text,
-      latitude: _currentPosition?.latitude,
-      longitude: _currentPosition?.longitude,
+      endereco: enderecoTexto,
+      latitude: finalLatitude,
+      longitude: finalLongitude,
       imageFile: _imageFile,
     );
     
@@ -150,12 +210,12 @@ class _CreateOccurrenceScreenState extends State<CreateOccurrenceScreen> {
 
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ocorrência salva com sucesso!')),
+        const SnackBar(content: Text('Ocorrência salva com sucesso!'), backgroundColor: Colors.green),
       );
       Navigator.pop(context);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Falha ao salvar.')),
+        const SnackBar(content: Text('Falha ao salvar ocorrência.'), backgroundColor: Colors.red),
       );
     }
   }
@@ -163,65 +223,59 @@ class _CreateOccurrenceScreenState extends State<CreateOccurrenceScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Relatar Problema')),
+      appBar: AppBar(title: const Text('Relatar Problema')),
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             TextField(
               controller: _descricaoController,
               maxLines: 3,
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'Descrição do Problema',
                 border: OutlineInputBorder(),
               ),
             ),
-            SizedBox(height: 15),
+            const SizedBox(height: 15),
             TextField(
               controller: _enderecoController,
-              decoration: InputDecoration(
-                labelText: 'Endereço (Opcional se usar GPS)', 
+              decoration: const InputDecoration(
+                labelText: 'Endereço / Nome da Rua', 
+                hintText: 'Ex: Rua 7 de Setembro, 1000',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.map),
               ),
-              onChanged: (value) {
-                if (_currentPosition != null) {
-                  setState(() {
-                    _currentPosition = null;
-                  });
-                }
-              },
             ),
-            SizedBox(height: 15),
+            const SizedBox(height: 15),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 ElevatedButton.icon(
                   onPressed: _getLocation,
-                  icon: Icon(Icons.gps_fixed),
-                  label: Text(_currentPosition == null ? 'Pegar GPS' : 'GPS OK'),
+                  icon: const Icon(Icons.gps_fixed),
+                  label: const Text('Usar GPS do Celular'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _currentPosition == null ? Colors.blue : Colors.green,
+                    backgroundColor: Colors.blue,
                   ),
                 ),
                 ElevatedButton.icon(
                   onPressed: _takePhoto,
-                  icon: Icon(Icons.camera_alt),
+                  icon: const Icon(Icons.camera_alt),
                   label: Text(_imageFile == null ? 'Tirar Foto' : 'Foto Anexada'),
                 ),
               ],
             ),
-            SizedBox(height: 30),
+            const SizedBox(height: 30),
             _isLoading 
-              ? Center(child: CircularProgressIndicator()) 
+              ? const Center(child: CircularProgressIndicator()) 
               : ElevatedButton(
                   onPressed: _submit,
-                  child: Text('ENVIAR OCORRÊNCIA', style: TextStyle(fontSize: 16)),
                   style: ElevatedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(vertical: 15),
+                    padding: const EdgeInsets.symmetric(vertical: 15),
                     backgroundColor: Colors.green,
                   ),
+                  child: const Text('ENVIAR OCORRÊNCIA', style: TextStyle(fontSize: 16, color: Colors.white)),
                 ),
           ],
         ),
