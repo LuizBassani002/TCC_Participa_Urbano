@@ -14,11 +14,34 @@ public class NLPClassificationService {
 
     public NLPClassificationService() {
         categoryKeywords = new HashMap<>();
-        categoryKeywords.put(Categoria.LIMPEZA_PUBLICA, List.of("lixo", "entulho", "sujeira", "mato", "limpeza", "fedendo", "animais", "barata", "rato"));
-        categoryKeywords.put(Categoria.ILUMINACAO_PUBLICA, List.of("poste", "luz", "escuro", "lampada", "apagado", "iluminacao", "queimada"));
-        categoryKeywords.put(Categoria.INFRAESTRUTURA, List.of("buraco", "asfalto", "calcada", "esgoto", "vazamento", "agua", "cano", "inundacao", "alagamento"));
-        categoryKeywords.put(Categoria.MEIO_AMBIENTE, List.of("arvore", "poda", "rio", "poluicao", "cheiro", "esgoto", "fumaça", "queimada"));
-        categoryKeywords.put(Categoria.SEGURANCA, List.of("assalto", "roubo", "policiamento", "perigoso", "suspeito", "tiro", "briga"));
+
+        // LIMPEZA PÚBLICA: Termos específicos de acúmulo, resíduos e manutenção higiênica
+        categoryKeywords.put(Categoria.LIMPEZA_PUBLICA, List.of(
+            "lixo", "entulho", "sujeira", "mato", "limpeza", "fedendo", "animais", 
+            "barata", "rato", "varricao", "capina", "descarte", "boca", "lobo", "vespas", "abelhas"
+        ));
+
+        // ILUMINAÇÃO PÚBLICA: Elementos de rede elétrica e iluminação de vias
+        categoryKeywords.put(Categoria.ILUMINACAO_PUBLICA, List.of(
+            "poste", "luz", "escuro", "lampada", "apagado", "iluminacao", "queimada", "luminaria"
+        ));
+
+        // INFRAESTRUTURA: Removidas palavras ambíguas de local ("calcada", "esgoto") 
+        // Mantidos apenas termos focados em patologias da via e obras
+        categoryKeywords.put(Categoria.INFRAESTRUTURA, List.of(
+            "buraco", "asfalto", "vazamento", "cano", "inundacao", "alagamento", 
+            "tapa", "cratera", "recapeamento", "sarjeta", "sarjetao", "galeria", "drenagem", "guias"
+        ));
+
+        // MEIO AMBIENTE: Poda, preservação e vegetação urbana
+        categoryKeywords.put(Categoria.MEIO_AMBIENTE, List.of(
+            "arvore", "poda", "rio", "poluicao", "cheiro", "fumaca", "praca", "parque", "raiz"
+        ));
+
+        // SEGURANÇA: Ocorrências de ordem pública
+        categoryKeywords.put(Categoria.SEGURANCA, List.of(
+            "assalto", "roubo", "policiamento", "perigoso", "suspeito", "tiro", "briga", "vandalismo"
+        ));
     }
 
     public Categoria classify(String description) {
@@ -33,7 +56,7 @@ public class NLPClassificationService {
             scores.put(cat, 0);
         }
 
-        // Count keyword matches
+        // Pontuação por frequência de termos das palavras processadas
         for (String word : processedWords) {
             for (Map.Entry<Categoria, List<String>> entry : categoryKeywords.entrySet()) {
                 if (entry.getValue().contains(word)) {
@@ -42,7 +65,6 @@ public class NLPClassificationService {
             }
         }
 
-        // Find highest score
         Categoria bestMatch = Categoria.OUTROS;
         int highestScore = 0;
 
@@ -53,7 +75,6 @@ public class NLPClassificationService {
             }
         }
 
-        // If no keywords matched, return OUTROS
         if (highestScore == 0) {
             return Categoria.OUTROS;
         }

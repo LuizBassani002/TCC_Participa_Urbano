@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart'; // tirar foto da câmera
+import 'package:geolocator/geolocator.dart'; // pegar GPS do celular
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:http/http.dart' as http; // fazer requisições HTTP
 import '../services/api_service.dart';
 
 class CreateOccurrenceScreen extends StatefulWidget {
@@ -16,8 +16,8 @@ class _CreateOccurrenceScreenState extends State<CreateOccurrenceScreen> {
   final _apiService = ApiService();
   final ImagePicker _picker = ImagePicker();
   
-  XFile? _imageFile;
-  Position? _currentPosition;
+  XFile? _imageFile; // guarda a foto tirada.
+  Position? _currentPosition; // guarda a posição GPS obtida.
   bool _isLoading = false;
 
   Future<void> _takePhoto() async {
@@ -40,7 +40,7 @@ class _CreateOccurrenceScreenState extends State<CreateOccurrenceScreen> {
       enderecoTexto = "$enderecoTexto, Blumenau, SC";
     }
 
-    try {
+    try { //API pública Nominatim (OpenStreetMap)
       final encodedAddress = Uri.encodeComponent(enderecoTexto);
       final url = Uri.parse(
         'https://nominatim.openstreetmap.org/search?format=json&q=$encodedAddress&limit=1',
@@ -81,7 +81,7 @@ class _CreateOccurrenceScreenState extends State<CreateOccurrenceScreen> {
   Future<void> _getLocation() async {
     bool serviceEnabled;
     LocationPermission permission;
-
+    //Verifica se o serviço de localização do celular está ativado
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -89,7 +89,7 @@ class _CreateOccurrenceScreenState extends State<CreateOccurrenceScreen> {
       );
       return;
     }
-
+    //Verifica/solicita permissão de localização ao usuário.
     permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
@@ -161,7 +161,7 @@ class _CreateOccurrenceScreenState extends State<CreateOccurrenceScreen> {
     }
   }
 
-  void _submit() async {
+  void _submit() async { //Envio da ocorrênciaEnvio da ocorrência
     if (_descricaoController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Preencha a descrição!')),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:jwt_decoder/jwt_decoder.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart'; //biblioteca para guardar dados sensíveis de forma criptografada no dispositivo (nesse caso, o token de login)
+import 'package:jwt_decoder/jwt_decoder.dart'; //biblioteca para decodificar um token JWT (JSON Web Token), que é o padrão usado para autenticação.
 import '../services/api_service.dart';
 import 'login_screen.dart';
 import 'create_occurrence_screen.dart';
@@ -32,7 +32,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (token != null) {
       Map<String, dynamic> decodedToken = JwtDecoder.decode(token);
       setState(() {
-        _userRole = decodedToken['role']; // Will be ROLE_CIDADAO or ROLE_GESTOR
+        _userRole = decodedToken['role']; 
         _isLoading = false;
       });
     } else {

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:flutter_map/flutter_map.dart'; //biblioteca que renderiza mapas interativos no Flutter (baseada em OpenStreetMap).
+import 'package:latlong2/latlong.dart'; //fornece a classe LatLng, usada para representar coordenadas geográficas (latitude/longitude).
 import '../services/api_service.dart';
 
 class MapaCalorScreen extends StatefulWidget {

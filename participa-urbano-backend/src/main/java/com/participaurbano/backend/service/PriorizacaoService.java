@@ -30,6 +30,8 @@ public class PriorizacaoService {
         score += getCategoryWeight(ocorrencia.getCategoria());
 
         // 2. Recorrência (Volume na mesma região - aprox. 1km raio)
+        // Monta uma "caixa" (área retangular) de aproximadamente 1km ao redor
+        // do ponto da ocorrência: pega a coordenada e soma/subtrai a margem de 1km
         if (ocorrencia.getLatitude() != null && ocorrencia.getLongitude() != null) {    
             Double latStart = ocorrencia.getLatitude() - LAT_KM;
             Double latEnd = ocorrencia.getLatitude() + LAT_KM;
@@ -43,7 +45,7 @@ public class PriorizacaoService {
                 .filter(o -> o.getStatus() != com.participaurbano.backend.domain.enums.StatusOcorrencia.RESOLVIDA)
                 .count();
                 
-            score += Math.min(naoResolvidasProximas * 2, 20); // Cap in 20 points
+            score += Math.min(naoResolvidasProximas * 2, 30); // Cap in 20 points
         }
 
         // 3. Tempo decorrido (Para testes unitários, podemos passar ocorrências antigas e ver a mudança)
@@ -59,7 +61,7 @@ public class PriorizacaoService {
         if (categoria == null) return 5;
         
         return switch (categoria) {
-            case SEGURANCA -> 25; // Very high
+            case SEGURANCA -> 25; 
             case INFRAESTRUTURA -> 20;
             case MEIO_AMBIENTE -> 15;
             case ILUMINACAO_PUBLICA, LIMPEZA_PUBLICA -> 10;
